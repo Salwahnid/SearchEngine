@@ -1,91 +1,77 @@
-from indexation import preprocess_text, store_query_index
-from collections import defaultdict
 import sqlite3
-from math import log
+from Indexation import preprocess_text  # Use the preprocess_text function from your indexation script
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
-# Fonction pour calculer le TF-IDF
-def compute_tfidf(db_connection, query_tokens):
+# Function to load indexed documents from the database
+def load_documents_from_db(db_connection):
     cursor = db_connection.cursor()
+    cursor.execute('SELECT DISTINCT doc_id, GROUP_CONCAT(term, " ") as content FROM inverted_index GROUP BY doc_id')
+    rows = cursor.fetchall()
+    doc_ids = [row[0] for row in rows]
+    documents = [row[1] for row in rows]
+    print("Documents loaded from DB:", documents)  # Debugging line
+    return doc_ids, documents
+
+# Function to calculate vector similarity
+def vectorial_search(query, documents, doc_ids):
+    vectorizer = TfidfVectorizer()
     
-    # 1. Récupérer tous les documents
-    cursor.execute('SELECT DISTINCT doc_id FROM inverted_index')
-    all_docs = cursor.fetchall()
-    total_docs = len(all_docs)
-
-    # 2. Calculer l'IDF pour chaque terme
-    idf_scores = {}
-    for term in query_tokens:
-        cursor.execute('SELECT DISTINCT doc_id FROM inverted_index WHERE term=?', (term,))
-        doc_freq = len(cursor.fetchall())
-        if doc_freq > 0:
-            idf_scores[term] = log(total_docs / doc_freq)
-
-    return idf_scores
-
-# Fonction pour rechercher les documents qui contiennent les termes de la requête
-def search_documents(query, db_connection):
-    # 1. Indexation de la requête dans la table `query_index` avant la recherche
-    store_query_index(query, db_connection)
-
-    # Tokenisation et traitement de la requête
-    query_tokens = preprocess_text(query)
-    cursor = db_connection.cursor()
-
-    # 2. Récupérer les termes de la requête et leurs fréquences depuis la table `query_index`
-    query_terms = {}
-    for pos, token in enumerate(query_tokens):
-        cursor.execute('SELECT frequency FROM query_index WHERE term=? AND query_id=?', (token, 1))
-        freq = cursor.fetchone()
-        if freq:
-            query_terms[token] = freq[0]
-
-    # 3. Calculer l'IDF des termes dans la requête
-    idf_scores = compute_tfidf(db_connection, query_tokens)
-
-    # 4. Calculer la similarité entre la requête et chaque document, et récupérer les positions et fréquences
-    doc_scores = defaultdict(float)  # Utilisation de float pour le calcul des scores
-    doc_positions = defaultdict(list)  # Dictionnaire pour stocker les positions et fréquences des termes dans chaque document
-
-    # Pour chaque terme dans la requête, chercher les documents correspondants dans `inverted_index`
-    for term, query_freq in query_terms.items():
-        cursor.execute('SELECT doc_id, position, frequency FROM inverted_index WHERE term=?', (term,))
-        rows = cursor.fetchall()
-        term_idf = idf_scores.get(term, 0)  # IDF pour le terme
-        for doc_id, position, doc_freq in rows:
-            # Calculer le score TF-IDF pour chaque document basé sur la fréquence du terme dans le document et la requête
-            tfidf_score = query_freq * term_idf * doc_freq
-            doc_scores[doc_id] += tfidf_score  # Ajouter au score du document
-            doc_positions[doc_id].append((term, position, doc_freq))  # Stocker le terme, sa position et sa fréquence
-
-    # 5. Trier les documents par score TF-IDF décroissant
-    ranked_documents = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
-
-    # 6. Préparer les résultats avec les positions et fréquences des termes dans les documents
-    results = []
-    for doc_id, score in ranked_documents:
-        positions_and_freqs = doc_positions[doc_id]
-        results.append((doc_id, score, positions_and_freqs))
-
-    return results
+    # Combine documents and query
+    all_texts = documents + [query]  
+    
+    # Debugging: Check the contents of all_texts
+    print("Contents of all_texts:", all_texts)
+    print("Types of elements in all_texts:", [type(text) for text in all_texts])
+    
+    # Ensure all elements are strings
+    all_texts = [str(text) if isinstance(text, str) else ' '.join(text) for text in all_texts]
+    
+    # Now you can safely call fit_transform
+    tfidf_matrix = vectorizer.fit_transform(all_texts)
+    
+    # The last line corresponds to the query vector
+    query_vector = tfidf_matrix[-1]
+    doc_vectors = tfidf_matrix[:-1]
+    
+    # Calculate cosine similarity
+    similarities = cosine_similarity(query_vector, doc_vectors).flatten()
+    
+    # Sort documents by relevance
+    ranked_indices = np.argsort(similarities)[::-1]
+    ranked_results = [(doc_ids[idx], similarities[idx]) for idx in ranked_indices]
+    return ranked_results
 
 if __name__ == "__main__":
-    db_file = "inverted_index.db"  # Nom de la base de données SQLite
-
-    # Connexion à la base de données SQLite
+    db_file = "inverted_index.db"
     db_connection = sqlite3.connect(db_file)
 
-    # Recherche des documents pertinents pour la requête
-    query = "analyse analyse données analyse des données pour la recherche"
-    print(f"Recherche des documents pour la requête : '{query}'")
+    # Load documents from the database
+    doc_ids, documents = load_documents_from_db(db_connection)
 
-    # Recherche des documents pertinents pour la requête
-    ranked_docs = search_documents(query, db_connection)
-    print("\nDocuments correspondants à la requête :")
-    for doc_id, score, positions_and_freqs in ranked_docs:
-        print(f"Document ID: {doc_id}, Score (TF-IDF): {score}")  # Display the TF-IDF score
-        print("Positions et fréquences des termes :")
-        for term, position, freq in positions_and_freqs:
-            print(f"Terme: '{term}', Position: {position}, Fréquence dans le document: {freq}")
+    # Preprocess documents using the function from the indexing file
+    documents = [preprocess_text(doc) for doc in documents]
 
-    # Fermeture de la connexion à la base de données
+    # Ensure all documents are strings
+    documents = [str(doc) for doc in documents]
+
+    # User query
+    query = "article"
+    query = preprocess_text(query)  # Preprocess the query as well
+
+    # Debugging: Check data types
+    print("Checking data types...")
+    #print([type(doc) for doc in documents])  # Ensure all are strings
+    #print(type(query))  # Check that the query is a string
+
+    # Perform vector similarity search
+    results = vectorial_search(query, documents, doc_ids)
+
+    # Display results
+    print("\nSearch results sorted by relevance:")
+    for doc_id, score in results:
+        print(f"Document ID: {doc_id} | Similarity: {score:.2f}")
+
+    # Close the database connection
     db_connection.close()
