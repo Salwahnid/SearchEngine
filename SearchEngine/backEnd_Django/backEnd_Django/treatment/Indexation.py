@@ -103,7 +103,7 @@ def display_inverted_index(db_connection, table_name):
         print(f"Mot : '{row[0]}' | Document/Requête : {row[1]} | Position : {row[2]} | Fréquence : {row[3]}")
 
 if __name__ == "__main__":
-    pdf_directory = "SearchEngine/backEnd_Django/backEnd_Django/data/code_penal_split_files"  # Chemin du dossier des PDF
+    pdf_directory = "backEnd_Django/data/code_penal_split_files"  # Chemin du dossier des PDF
     db_file = "inverted_index.db"  # Nom de la base de données SQLite
 
     # Connexion à la base de données SQLite
@@ -116,7 +116,7 @@ if __name__ == "__main__":
         print(f"Le dossier spécifié n'existe pas : {pdf_directory}")
 
     # Indexation d'une requête
-    query = "violence domestique"
+    query = "Sanctions pour fraude fiscale"
     print(f"Indexation de la requête : '{query}'")
     store_query_index(query, db_connection)
 

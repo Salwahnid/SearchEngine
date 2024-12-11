@@ -11,6 +11,10 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import os
+
+from django.conf import settings
+from sympy import Idx 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -28,6 +32,16 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
+
+# MEDIA_URL définit l'URL utilisée pour accéder aux fichiers média dans ton application
+MEDIA_URL = '/code_penal_split_files/'
+
+
+MEDIA_ROOT = os.path.join(BASE_DIR, 'backEnd_Django/data/code_penal_split_files')
+# MEDIA_ROOT définit le chemin physique sur le serveur où les fichiers seront stockés
+#MEDIA_ROOT = os.path.join(BASE_DIR, 'backEnd_Django', 'data', 'code_penal_split_files')
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -37,6 +51,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'corsheaders',
+    'backEnd_Django.treatment',
 ]
 
 MIDDLEWARE = [
@@ -47,6 +64,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Le port du frontend React
 ]
 
 ROOT_URLCONF = 'backEnd_Django.urls'
@@ -76,7 +98,7 @@ WSGI_APPLICATION = 'backEnd_Django.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': BASE_DIR / 'inverted_index.db',
     }
 }
 
@@ -121,3 +143,6 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+

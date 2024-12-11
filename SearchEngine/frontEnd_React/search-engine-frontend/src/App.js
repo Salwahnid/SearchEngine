@@ -1,28 +1,30 @@
-import React, { useState } from "react";
-import Navbar from "./components/Navbar";
-import SearchBar from "./components/SearchBar";
-import ResultsList from "./components/ResultsList";
+import React, { useState, useEffect } from "react";
+import axios from "axios";  // Si tu utilises axios
+import SearchBar from './components/SearchBar'; // Assume this is your search bar component
+import ResultsList from './components/ResultsList'; // Component for displaying search results
+import Navbar from './components/Navbar'; // Assume this is your navbar component
 
 const App = () => {
-  const [language, setLanguage] = useState("fr"); // Langue initiale
   const [results, setResults] = useState([]);
+  const [language, setLanguage] = useState("fr"); // Langue initiale
 
-  const staticData = [
-    { title: "Document 1", snippet: "Ceci est un extrait du document 1." },
-    { title: "Document 2", snippet: "Ceci est un extrait du document 2." },
-    { title: "Document 3", snippet: "Ceci est un extrait du document 3." },
-  ];
-
-  const fetchResults = (query) => {
-    const filteredResults = staticData.filter((doc) =>
-      doc.title.toLowerCase().includes(query.toLowerCase())
-    );
-    setResults(filteredResults);
+  // Fonction pour envoyer la requête de recherche
+  const searchHandler = async (query) => {
+    try {
+      const response = await axios.get("http://localhost:8000/api/search/", {
+        params: { query: query, timestamp: new Date().getTime() },  // Ajoute un paramètre unique pour éviter le cache
+      });
+      console.log("response data",response.data);  
+      setResults(response.data);  // Les résultats de l'API Django
+    } catch (error) {
+      console.error("Erreur lors de la recherche :", error);
+    }
   };
 
-  const handleChangeLanguage = (lang) => {
-    setLanguage(lang); // Changer la langue
-  };
+
+  useEffect(() => {
+    console.log(results); // Vérifier quand les résultats changent
+  }, [results]); 
 
   // Textes dynamiques pour chaque langue
   const texts = {
@@ -46,6 +48,11 @@ const App = () => {
     },
   };
 
+  // Fonction pour changer la langue
+  const handleChangeLanguage = (lang) => {
+    setLanguage(lang); // Changer la langue
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-200 to-white dark:bg-gradient-to-r dark:from-gray-900 dark:to-gray-800 dark:text-white">
       {/* Navbar avec changement de langue */}
@@ -55,11 +62,13 @@ const App = () => {
         <h1 className="mb-8 text-3xl font-bold text-center text-blue-600 dark:text-blue-400">
           {texts[language].title}
         </h1>
+        {/* Search Bar */}
         <SearchBar
-          onSearch={fetchResults}
+          onSearch={searchHandler}
           placeholder={texts[language].searchPlaceholder}
           buttonText={texts[language].searchButton}
         />
+        {/* Liste des résultats */}
         <ResultsList
           results={results}
           noResultsText={texts[language].noResults}
